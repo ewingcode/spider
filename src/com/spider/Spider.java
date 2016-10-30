@@ -2,6 +2,7 @@ package com.spider;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -95,9 +96,14 @@ public class Spider {
 							src.attr("height"), trim(src.attr("alt"), 20));
 				} else {
 					print(" * %s: <%s>", src.tagName(), src.attr("abs:src"));
+					print(" * %s: <%s>", src.tagName(),
+							src.attr("abs:data-main"));
 				}
 				put2Resources(src.tagName(), src.attr("abs:src"));
+				put2Resources(src.tagName(), src.attr("abs:data-main"));
 				src.attr("src", replaceResourceLink(src.attr("abs:src")));
+				src.attr("data-main",
+						replaceResourceLink(src.attr("abs:data-main")));
 			}
 
 			print("\nImports: (%d)", imports.size());
@@ -114,7 +120,9 @@ public class Spider {
 				print(" * a: <%s>  (%s)", link.attr("abs:href"),
 						trim(link.text(), 35));
 				put2Links("a", link.attr("abs:href"));
-				link.attr("href", replaceResourceLink(link.attr("abs:href")));
+				link.attr("href", appendHtmlSuffix(replaceResourceLink(link
+						.attr("abs:href"))));
+
 			}
 
 			Receiver.writeFile(file, doc.toString());
@@ -128,14 +136,28 @@ public class Spider {
 
 	}
 
-	private String replaceLink(String url) {
+	private String appendHtmlSuffix(String linkUrl) {
+		String url = linkUrl.replace(website, "");
+		if (url.equals("/") || url.isEmpty() || url.indexOf(".") > -1)
+			return linkUrl;
+		linkUrl = website + linkUrl.substring(linkUrl.lastIndexOf("/"));
+		return linkUrl + ".html";
+	}
+
+	private String replaceLink(String url) { 
+		url = appendHtmlSuffix(url);
+		if (url.indexOf("?") > -1)
+			url = url.substring(0, url.indexOf("?"));
+		String urlResult = "";
 		if (url.matches(REPLACE_MATCH)) {
-			return url.replace(website, "").replaceAll("\\?", "")
-					.replace(":", "");
+			urlResult = url.replace(website, "")/* .replaceAll("\\?", "") */
+			.replace(":", "").replace("//", "/").replace("#", "");
 		} else {
-			return url.replace(website, "").replaceAll("\\?", "")
-					.replace("/", "").replace(":", "");
+			urlResult = url.replace(website, "").replaceAll("\\?", "")
+			// .replace("/", "")
+					.replace(":", "").replace("//", "/").replace("#", "");
 		}
+		return urlResult;
 	}
 
 	private String replaceResourceLink(String oldLink) {
@@ -230,8 +252,6 @@ public class Spider {
 		}
 
 		private void downJsUrl() {
-			if (url.contains("widgetkit-dd06fd3b.js"))
-				System.out.println(1111);
 			String regEx = "load\\(.+?\\)";
 			if (url.endsWith(".js")) {
 				String jsContent = null;
@@ -246,7 +266,7 @@ public class Spider {
 								continue;
 							cssUrl = cssUrl.substring(0, cssUrl.length() - 1)
 									.replace("load(", "").replace("'", "");
-							cssUrl = website + cssUrl;
+							// cssUrl = website + cssUrl;
 							File cssUrlFile = getFileByUrl(cssUrl);
 							System.out.println("receive js url:" + cssUrl
 									+ " cssUrlFile:"
@@ -276,8 +296,6 @@ public class Spider {
 					while (mat.find()) {
 						try {
 							String cssUrl = mat.group();
-							if (cssUrl.contains("common.css"))
-								System.out.println(111);
 							cssUrl = cssUrl.substring(0, cssUrl.length() - 1)
 									.replace("url(", "");
 							cssUrl = url.replace(resourceFile.getName(), "")
@@ -289,12 +307,13 @@ public class Spider {
 									+ cssUrlFile.getAbsolutePath());
 
 							Receiver.downResource(cssUrl, cssUrlFile);
-							//Èç@import url(common.css);ÕâÊ±ºòÐèÒª¼ÌÐø¶ÁÈ¡ÄÚÈÝ¼ÌÐøÏÂÔØ
+							// ï¿½ï¿½@import
+							// url(common.css);ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ý¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 							if (cssUrl.endsWith(".css")) {
-								CountDownLatch latch = new CountDownLatch(1); 
-								File resourceFile = getFileByUrl(cssUrl); 
+								CountDownLatch latch = new CountDownLatch(1);
+								File resourceFile = getFileByUrl(cssUrl);
 								new DownThread(latch, cssUrl, resourceFile)
-										.start(); 
+										.start();
 								try {
 									latch.await();
 								} catch (InterruptedException e) {
@@ -327,9 +346,8 @@ public class Spider {
 	}
 
 	public static void main(String[] args) throws IOException {
-		Spider spider = new Spider("http://www.vgooo.com",
-				"E:\\workspace\\spiderweb\\vgooo\\", -1);
+		Spider spider = new Spider("https://www.weidian.com/",
+				"D:\\ewing\\spiderweb\\weidian", 4);
 		spider.scan(null, 0);
-
 	}
 }
